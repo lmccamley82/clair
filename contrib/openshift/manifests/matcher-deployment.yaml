@@ -1,0 +1,99 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clair-matcher
+  labels:
+    service: matcher
+    app: clair
+  spec:
+    replicas: ${{MATCHER_DEPLOYMENT_REPLICAS}}
+    selector:
+      matchLabels:
+        service: matcher
+        app: clair
+    template:
+      metadata:
+        name: clair-matcher
+        labels:
+          service: matcher
+          app: clair
+      spec:
+        volumes:
+          - name: clair-config
+            secret:
+              secretName: ${{CLAIR_CONFIG_SECRET}}
+              items:
+                - key: clair_config
+                  path: clair.conf
+        containers:
+          - name: clair-matcher
+            resources:
+              limits:
+                cpu: ${{MATCHER_CPU_LIMITS}}
+                memory: ${{MATCHER_MEM_LIMITS}}
+              requests:
+                cpu: ${{MATCHER_CPU_REQS}}
+                memory: ${{MATCHER_MEM_REQS}}
+            command: [clair]
+            env:
+              - name: CLAIR_CONF
+                value: '/etc/clair/clair.conf'
+              - name: CLAIR_MODE
+                value: matcher
+            image: ${{CLAIR_IMAGE}}
+            ports:
+              - containerPort: ${{HTTP_TRANSPORT_PORT}}
+                name: http-transport
+              - containerPort: ${{INTROSPECTION_PORT}}
+                name: introspection
+            livenessProbe:
+              httpGet:
+                path: ${{HEALTH_PATH}}
+                port: ${{HEALTH_PORT}}
+            readinessProbe:
+              httpGet:
+                path: ${{HEALTH_PATH}}
+                port: ${{HEALTH_PORT}}
+            startupProbe:
+              httpGet:
+                path: ${{HEALTH_PATH}}
+                port: ${{HEALTH_PORT}}
+            volumeMounts:
+              name: clair-config
+              mountPath: /etc/clair
+
+parameters:
+  - name: MATCHER_DEPLOYMENT_REPLICAS
+    value: 4
+    displayName: the number of matchers deployed
+  - name: CLAIR_CONFIG_SECRET
+    value: clair-config
+    displayName: the vault secret containing clair's config
+  - name: MATCHER_CPU_LIMITS
+    value: "4"
+    displayName: the matcher's cpu limits in vCPUs
+  - name: MATCHER_CPU_REQS
+    value: "2"
+    displayName: the matcher's cpu requests in vCPUs
+  - name: MATCHER_MEM_LIMITS
+    value: "8192Mi"
+    displayName: the matcher's memory limits in vCPUs
+  - name: MATCHER_MEM_REQS
+    value: "4096Mi"
+    displayName: the matcher's memory requests in vCPUs
+  - name: CLAIR_IMAGE
+    value: ""
+    displayName: the image of clair v4 to deploy
+  - name: HTTP_TRANSPORT_PORT
+    value: 8080
+    displayName: the http port where clair's main functionality is provided
+  - name: INTROSPECTION_PORT
+    value: 8089
+    displayName: the http port where clair's introspection functionality is provided
+  - name: HEALTH_PATH
+    value: "/healthz"
+    displayName: the http path to clair's health check endpoint
+  - name: HEALTH_PORT
+    value: 8089
+    displayName: the port to clair's health check endpoint

@@ -1,0 +1,99 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clair-indexer
+  labels:
+    service: indexer
+    app: clair
+  spec:
+    replicas: ${{INDEXER_DEPLOYMENT_REPLICAS}}
+    selector:
+      matchLabels:
+        service: indexer
+        app: clair
+    template:
+      metadata:
+        name: clair-indexer
+        labels:
+          service: indexer
+          app: clair
+      spec:
+        volumes:
+          - name: clair-config
+            secret:
+              secretName: ${{CLAIR_CONFIG_SECRET}}
+              items:
+                - key: clair_config
+                  path: clair.conf
+        containers:
+          - name: clair-indexer
+            resources:
+              limits:
+                cpu: ${{INDEXER_CPU_LIMITS}}
+                memory: ${{INDEXER_MEM_LIMITS}}
+              requests:
+                cpu: ${{INDEXER_CPU_REQS}}
+                memory: ${{INDEXER_MEM_REQS}}
+            command: [clair]
+            env:
+              - name: CLAIR_CONF
+                value: '/etc/clair/clair.conf'
+              - name: CLAIR_MODE
+                value: indexer
+            image: ${{CLAIR_IMAGE}}
+            ports:
+              - containerPort: ${{HTTP_TRANSPORT_PORT}}
+                name: http-transport
+              - containerPort: ${{INTROSPECTION_PORT}}
+                name: introspection
+            livenessProbe:
+              httpGet:
+                path: ${{HEALTH_PATH}}
+                port: ${{HEALTH_PORT}}
+            readinessProbe:
+              httpGet:
+                path: ${{HEALTH_PATH}}
+                port: ${{HEALTH_PORT}}
+            startupProbe:
+              httpGet:
+                path: ${{HEALTH_PATH}}
+                port: ${{HEALTH_PORT}}
+            volumeMounts:
+              name: clair-config
+              mountPath: /etc/clair
+
+parameters:
+  - name: INDEXER_DEPLOYMENT_REPLICAS
+    value: 4
+    displayName: the number of indexers deployed
+  - name: CLAIR_CONFIG_SECRET
+    value: clair-config
+    displayName: the vault secret containing clair's config
+  - name: INDEXER_CPU_LIMITS
+    value: "4"
+    displayName: the indexer's cpu limits in vCPUs
+  - name: INDEXER_CPU_REQS
+    value: "2"
+    displayName: the indexer's cpu requests in vCPUs
+  - name: INDEXER_MEM_LIMITS
+    value: "8192Mi"
+    displayName: the indexer's memory limits in vCPUs
+  - name: INDEXER_MEM_REQS
+    value: "4096Mi"
+    displayName: the indexer's memory requests in vCPUs
+  - name: CLAIR_IMAGE
+    value: ""
+    displayName: the image of clair v4 to deploy
+  - name: HTTP_TRANSPORT_PORT
+    value: 8080
+    displayName: the http port where clair's main functionality is provided
+  - name: INTROSPECTION_PORT
+    value: 8089
+    displayName: the http port where clair's introspection functionality is provided
+  - name: HEALTH_PATH
+    value: "/healthz"
+    displayName: the http path to clair's health check endpoint
+  - name: HEALTH_PORT
+    value: 8089
+    displayName: the port to clair's health check endpoint
